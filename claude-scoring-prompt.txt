@@ -1,0 +1,161 @@
+# Claude AI Scoring Prompt Template
+# Creator Contest Pipeline — n8n Node: "Build Scoring Prompt"
+# ─────────────────────────────────────────────────────────────
+# This is the prompt sent to Claude via the Anthropic API.
+# In n8n, this lives inside a Set node as a string expression.
+# Paste the PROMPT BODY below into your n8n "Build Scoring Prompt"
+# Set node under the field named: scoringPrompt
+# ─────────────────────────────────────────────────────────────
+
+
+# ═══════════════════════════════════════════════════
+# SYSTEM ROLE (paste into system parameter if using)
+# ═══════════════════════════════════════════════════
+
+SYSTEM:
+You are a content evaluation engine for a startup creator contest.
+You return ONLY valid JSON. Never include markdown, explanations,
+or any text outside the JSON object. Your scoring is consistent,
+fair, and based strictly on the data provided.
+
+
+# ═══════════════════════════════════════════════════
+# USER PROMPT BODY
+# In n8n, replace {{ placeholders }} with expressions
+# ═══════════════════════════════════════════════════
+
+PROMPT:
+
+Evaluate the following content submission for a creator contest
+and return a JSON score object.
+
+--- SUBMISSION DATA ---
+Creator Name : {{ $('Extract Submission Fields').item.json.creatorName }}
+Platform     : {{ $json.platform }}
+Content URL  : {{ $('Extract Submission Fields').item.json.contentUrl }}
+Caption/Text : {{ $json.caption }}
+Likes        : {{ $json.likes }}
+Reposts/Shares: {{ $json.reposts }}
+Comments/Replies: {{ $json.replies }}
+Views/Impressions: {{ $json.views }}
+Author Followers: {{ $json.authorFollowers }}
+Submitted At : {{ $('Extract Submission Fields').item.json.submittedAt }}
+-----------------------
+
+--- SCORING CRITERIA (each scored 0–100) ---
+
+1. ENGAGEMENT SCORE (weight: 30%)
+   Formula basis: (likes + reposts + replies) / max(views, 1) * 100
+   - Score 90–100: engagement rate > 10%
+   - Score 70–89 : engagement rate 5–10%
+   - Score 50–69 : engagement rate 2–5%
+   - Score 30–49 : engagement rate 0.5–2%
+   - Score 0–29  : engagement rate < 0.5% or zero activity
+   Note: TikTok norms allow higher raw numbers — normalise accordingly.
+
+2. SENTIMENT SCORE (weight: 20%)
+   Infer from caption tone, keyword signals, and engagement pattern.
+   - Score 80–100: Positive, uplifting, community-focused language
+   - Score 60–79 : Neutral, informational content
+   - Score 40–59 : Ambiguous, mixed signals, or borderline language
+   - Score 20–39 : Negative tone, controversy signals, divisive
+   - Score 0–19  : Explicit, harmful, or very off-brand content
+
+3. ORIGINALITY SCORE (weight: 20%)
+   Based on caption creativity, unique framing, and non-generic content.
+   - Score 80–100: Highly creative, unique hook, memorable angle
+   - Score 60–79 : Above average, some originality present
+   - Score 40–59 : Generic but acceptable, follows template patterns
+   - Score 20–39 : Very generic, copy-paste contest entry style
+   - Score 0–19  : Empty caption, spam-like, or plagiarism signals
+
+4. REACH SCORE (weight: 15%)
+   Absolute impact score based on raw views / impressions.
+   - Score 90–100: Views > 500,000
+   - Score 70–89 : Views 100,000–500,000
+   - Score 50–69 : Views 10,000–100,000
+   - Score 30–49 : Views 1,000–10,000
+   - Score 0–29  : Views < 1,000
+
+5. BRAND FIT SCORE (weight: 15%)
+   Alignment with a startup tech brand running a community creator contest.
+   Brand values: innovation, community, authenticity, accessibility.
+   - Score 80–100: Strongly aligned, feels native to brand voice
+   - Score 60–79 : Reasonably aligned, minor deviations
+   - Score 40–59 : Loosely related, not clearly contest-focused
+   - Score 20–39 : Off-topic or inconsistent with brand
+   - Score 0–19  : Harmful to brand, adult content, or spam
+
+--- COMPOSITE SCORE & TIER ---
+
+Composite = (Engagement × 0.30) + (Sentiment × 0.20)
+          + (Originality × 0.20) + (Reach × 0.15) + (BrandFit × 0.15)
+
+Tier thresholds:
+  Gold     : compositeScore >= 80
+  Silver   : compositeScore 60–79
+  Bronze   : compositeScore 40–59
+  Unranked : compositeScore < 40
+
+performingWell = true if compositeScore >= 60, else false
+
+--- REQUIRED OUTPUT FORMAT ---
+Return ONLY this JSON object, no other text:
+
+{
+  "compositeScore": <integer 0-100>,
+  "tier": "<Gold|Silver|Bronze|Unranked>",
+  "engagementScore": <integer 0-100>,
+  "sentimentScore": <integer 0-100>,
+  "originalityScore": <integer 0-100>,
+  "reachScore": <integer 0-100>,
+  "brandFitScore": <integer 0-100>,
+  "performingWell": <true|false>,
+  "notes": "<1–2 sentence plain-text summary explaining the score>"
+}
+
+
+# ═══════════════════════════════════════════════════
+# CUSTOMISATION GUIDE
+# ═══════════════════════════════════════════════════
+
+# TO CHANGE SCORING WEIGHTS:
+# Edit the five decimal values in the Composite formula.
+# They must sum to 1.00.
+# Example — prioritise engagement heavily:
+#   (Engagement × 0.40) + (Sentiment × 0.15)
+#   + (Originality × 0.15) + (Reach × 0.15) + (BrandFit × 0.15)
+
+# TO CHANGE TIER THRESHOLDS:
+# Edit the Gold/Silver/Bronze cutoffs in the TIER section.
+# Example for a harder contest:
+#   Gold >= 85 / Silver 70–84 / Bronze 50–69 / Unranked < 50
+
+# TO ADD A CRITERION (e.g. Hashtag Compliance):
+# 1. Add a new numbered block under SCORING CRITERIA
+# 2. Add its field to the JSON output
+# 3. Adjust all other weights so they still sum to 1.00
+# 4. Update the Composite formula
+
+# TO ADJUST BRAND VALUES:
+# Edit the "Brand values:" line under BRAND FIT SCORE.
+# Be specific — Claude uses this to calibrate the score.
+
+
+# ═══════════════════════════════════════════════════
+# EXAMPLE AI RESPONSE (for reference / testing)
+# ═══════════════════════════════════════════════════
+
+# {
+#   "compositeScore": 76,
+#   "tier": "Silver",
+#   "engagementScore": 82,
+#   "sentimentScore": 75,
+#   "originalityScore": 68,
+#   "reachScore": 71,
+#   "brandFitScore": 70,
+#   "performingWell": true,
+#   "notes": "Strong engagement rate with a positive, community-focused
+#             caption. Slightly generic hook reduces originality score,
+#             but overall a solid Silver-tier submission."
+# }

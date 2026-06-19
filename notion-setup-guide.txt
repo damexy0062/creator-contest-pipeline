@@ -1,0 +1,288 @@
+# Notion Database Setup Guide
+# Creator Contest Content Pipeline
+# ══════════════════════════════════════════════════════════════════
+# Follow every step in order. Estimated setup time: 25–35 minutes.
+# ══════════════════════════════════════════════════════════════════
+
+
+────────────────────────────────────────
+STEP 1 — CREATE THE NOTION DATABASE
+────────────────────────────────────────
+
+1. Open Notion → click "+ New page" in your sidebar.
+2. Give the page a title: "Creator Contest Submissions"
+3. Type /database → select "Table — Full page"
+4. You now have a blank table. Proceed to Step 2 to add all fields.
+
+
+────────────────────────────────────────
+STEP 2 — ADD DATABASE PROPERTIES
+────────────────────────────────────────
+
+Delete the default "Tags" column first (click column → Delete).
+Then add the following properties in order:
+
+┌─────────────────────┬──────────────┬─────────────────────────────────────────────────────────────┐
+│ Field Name          │ Type         │ Configuration                                               │
+├─────────────────────┼──────────────┼─────────────────────────────────────────────────────────────┤
+│ Creator Name        │ Title        │ (already exists — rename "Name" to "Creator Name")          │
+│ Platform            │ Select       │ Options: Twitter, TikTok                                    │
+│ Content URL         │ URL          │ No extra config needed                                      │
+│ Submission Date     │ Date         │ Include time: ON                                            │
+│ Status              │ Select       │ Options: Pending (yellow), Processed (green), Error (red)   │
+│ AI Score            │ Number       │ Format: Number, no decimals                                 │
+│ Tier                │ Select       │ Options: Gold (yellow), Silver (gray), Bronze (orange),     │
+│                     │              │          Unranked (default)                                 │
+│ Engagement Score    │ Number       │ Format: Number                                              │
+│ Sentiment Score     │ Number       │ Format: Number                                              │
+│ Originality Score   │ Number       │ Format: Number                                              │
+│ Reach Score         │ Number       │ Format: Number                                              │
+│ Brand Fit Score     │ Number       │ Format: Number                                              │
+│ Performing Well     │ Checkbox     │ No extra config needed                                      │
+│ AI Notes            │ Text         │ No extra config needed                                      │
+│ Processed At        │ Date         │ Include time: ON  (n8n writes this when scoring completes)  │
+└─────────────────────┴──────────────┴─────────────────────────────────────────────────────────────┘
+
+HOW TO ADD EACH PROPERTY:
+  → Click "+" at the far right of the column headers
+  → Select the property type from the dropdown
+  → Type the field name exactly as shown above (n8n matches by name)
+  → For Select fields, add each option listed
+
+
+────────────────────────────────────────
+STEP 3 — SET DEFAULT VALUE FOR STATUS
+────────────────────────────────────────
+
+1. Click the "Status" column header → Edit property
+2. Under "Default value" → select "Pending"
+   This ensures every new form submission starts as Pending
+   so n8n picks it up on the next run.
+
+
+────────────────────────────────────────
+STEP 4 — CREATE THE PUBLIC INTAKE FORM
+────────────────────────────────────────
+
+This is how creators submit their content links.
+
+1. Open your "Creator Contest Submissions" database
+2. Click the "..." menu (top right) → "Add a view"
+3. Select "Form" → name it "Submit Your Entry"
+4. In the form editor, enable ONLY these fields:
+     ✓ Creator Name     (required — toggle ON)
+     ✓ Platform         (required — toggle ON)
+     ✓ Content URL      (required — toggle ON)
+     ✓ Submission Date  (optional — set to auto-fill today's date)
+
+   HIDE these fields from the form (n8n fills them):
+     ✗ Status
+     ✗ AI Score
+     ✗ Tier
+     ✗ Engagement Score
+     ✗ Sentiment Score
+     ✗ Originality Score
+     ✗ Reach Score
+     ✗ Brand Fit Score
+     ✗ Performing Well
+     ✗ AI Notes
+     ✗ Processed At
+
+5. Edit the form title to: "Submit Your Contest Entry"
+6. Add description: "Paste your Twitter or TikTok contest link below.
+   All submissions are reviewed within 1 hour."
+7. Click "Share form" → toggle "Anyone with the link" ON
+8. Copy the share link — this is what you give to creators.
+
+
+────────────────────────────────────────
+STEP 5 — CREATE DATABASE VIEWS
+────────────────────────────────────────
+
+Create these views to build your leaderboard and monitoring dashboard.
+
+VIEW 1: Leaderboard (Table view)
+  → Click "+ Add a view" → Table → name "Leaderboard"
+  → Filter: Status = Processed
+  → Sort: AI Score → Descending
+  → Show columns: Creator Name, Platform, AI Score, Tier,
+                  Engagement Score, Performing Well, AI Notes
+
+VIEW 2: Gold Creators (Gallery view)
+  → Click "+ Add a view" → Gallery → name "Gold Creators"
+  → Filter: Tier = Gold AND Status = Processed
+  → Sort: AI Score → Descending
+  → Card preview: AI Notes
+
+VIEW 3: Pending Review (Table view)
+  → Click "+ Add a view" → Table → name "Pending Review"
+  → Filter: Status = Pending
+  → Sort: Submission Date → Ascending (oldest first)
+  → Use this to monitor what's in the queue
+
+VIEW 4: Platform Split (Board view)
+  → Click "+ Add a view" → Board → name "By Platform"
+  → Group by: Platform
+  → Filter: Status = Processed
+  → Sort: AI Score → Descending
+
+VIEW 5: Performance Chart (Chart view — Notion Plus/Business)
+  → Click "+ Add a view" → Chart → name "Performance Overview"
+  → X-axis: Tier
+  → Y-axis: Count of entries
+  → This gives you the tier distribution bar chart
+
+
+────────────────────────────────────────
+STEP 6 — GET YOUR NOTION API CREDENTIALS
+────────────────────────────────────────
+
+You need two things for n8n: an API key and your Database ID.
+
+TO GET YOUR NOTION API KEY:
+  1. Go to https://www.notion.so/my-integrations
+  2. Click "+ New integration"
+  3. Name it "Contest Pipeline n8n"
+  4. Associate with your workspace
+  5. Capabilities needed: Read content, Update content, Insert content
+  6. Click Submit → copy the "Internal Integration Secret"
+  7. This is your NOTION_API_KEY → paste into n8n credentials
+
+TO GET YOUR DATABASE ID:
+  1. Open your "Creator Contest Submissions" database in Notion
+  2. Click "Share" → "Copy link"
+  3. The URL looks like:
+     https://www.notion.so/yourworkspace/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX?v=...
+  4. The 32-character string between the last "/" and "?" is your Database ID
+  5. Format it as: XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX (add hyphens after
+     positions 8, 12, 16, 20)
+  6. Paste this into the n8n workflow where it says YOUR_NOTION_DATABASE_ID
+
+TO CONNECT YOUR INTEGRATION TO THE DATABASE:
+  1. Open the database → click "..." → "Add connections"
+  2. Search for "Contest Pipeline n8n" → click to connect
+  3. Without this step the API will return 404 errors
+
+
+────────────────────────────────────────
+STEP 7 — NOTION FORMULA HELPERS
+────────────────────────────────────────
+
+Add these as Formula properties for instant dashboard metrics.
+
+FORMULA: Performance Rating (add as "Performance Rating" Text formula)
+  if(prop("AI Score") >= 80, "🥇 Gold",
+    if(prop("AI Score") >= 60, "🥈 Silver",
+      if(prop("AI Score") >= 40, "🥉 Bronze",
+        "📊 Unranked")))
+
+FORMULA: Engagement Label (add as "Engagement Label" Text formula)
+  if(prop("Engagement Score") >= 80, "High",
+    if(prop("Engagement Score") >= 50, "Medium", "Low"))
+
+FORMULA: Score Bar (add as "Score Visual" Text formula)
+  slice("██████████", 0, floor(prop("AI Score") / 10)) +
+  slice("░░░░░░░░░░", 0, 10 - floor(prop("AI Score") / 10)) +
+  " " + format(prop("AI Score")) + "/100"
+
+
+────────────────────────────────────────
+STEP 8 — BUILD YOUR MONITORING DASHBOARD
+────────────────────────────────────────
+
+Create a separate Notion PAGE (not database) as your dashboard.
+
+1. New page → title "Contest Dashboard"
+2. Use /linked-view to embed each database view:
+   - Embed "Leaderboard" view  → shows ranked creators
+   - Embed "Pending Review" view → shows queue
+   - Embed "Performance Chart" view → shows tier distribution
+   - Embed "Gold Creators" view → featured highlight
+
+3. Add a Notion Callout block at the top with contest rules:
+   /callout → paste your contest rules summary
+
+4. Add a divider and the form share link so you can copy it quickly.
+
+5. Share this dashboard page with your team:
+   → Click "Share" → invite teammates by email
+   → Set to "Can view" for observers, "Can edit" for contest managers
+
+
+────────────────────────────────────────
+STEP 9 — CONNECT N8N TO NOTION
+────────────────────────────────────────
+
+In your n8n instance:
+
+1. Go to Settings → Credentials → New Credential
+2. Select "Notion API"
+3. Name it: "Notion account"
+4. Paste your Internal Integration Secret from Step 6
+5. Save credential
+
+6. Open the imported workflow JSON
+7. In both Notion nodes ("Get Pending Submissions" and
+   "Update Notion Record"), set the credential to "Notion account"
+8. In "Get Pending Submissions", replace YOUR_NOTION_DATABASE_ID
+   with your actual database ID from Step 6
+
+
+────────────────────────────────────────
+STEP 10 — TEST THE FULL PIPELINE
+────────────────────────────────────────
+
+1. Submit a test entry via your form:
+   Creator Name: Test Creator
+   Platform: Twitter
+   Content URL: https://twitter.com/i/web/status/1234567890
+
+2. In n8n, open your workflow → click "Test workflow"
+3. Watch each node execute — green = success, red = error
+4. Check the "Parse AI Response" node output to see Claude's scores
+5. Open Notion → the test row should now show:
+   - Status: Processed
+   - AI Score: a number
+   - Tier: one of Gold/Silver/Bronze/Unranked
+   - All five criterion scores filled in
+   - AI Notes: Claude's written summary
+
+6. If the Notion update fails, check:
+   ✓ Database ID is correct and formatted with hyphens
+   ✓ Integration is connected to the database (Step 6)
+   ✓ All field names in n8n match Notion exactly (case-sensitive)
+
+7. If Claude returns empty or wrong JSON, check:
+   ✓ Anthropic API key is valid
+   ✓ The content URL pulled valid metadata from Twitter/TikTok
+   ✓ The caption field isn't empty
+
+
+────────────────────────────────────────
+QUICK REFERENCE — THINGS TO REPLACE IN N8N
+────────────────────────────────────────
+
+In the workflow JSON, find and replace these placeholders:
+
+  YOUR_NOTION_DATABASE_ID      → your 32-char database ID with hyphens
+  YOUR_NOTION_CREDENTIAL_ID    → auto-assigned by n8n after you add credential
+  YOUR_ANTHROPIC_API_KEY       → from console.anthropic.com → API Keys
+  YOUR_TWITTER_BEARER_TOKEN    → from developer.twitter.com → your app
+  YOUR_TIKTOK_ACCESS_TOKEN     → from developers.tiktok.com → your app
+  YOUR_SLACK_WEBHOOK_URL       → from api.slack.com → Incoming Webhooks
+                                 (optional — remove the Slack node if not needed)
+
+
+────────────────────────────────────────
+TIER SUMMARY
+────────────────────────────────────────
+
+  🥇 Gold     AI Score ≥ 80   → Top performers, potential winners
+  🥈 Silver   AI Score 60–79  → Strong entries, performing well
+  🥉 Bronze   AI Score 40–59  → Average, needs improvement
+  📊 Unranked AI Score < 40   → Low engagement or off-brand
+
+
+══════════════════════════════════════════════════════════════════
+END OF SETUP GUIDE
+══════════════════════════════════════════════════════════════════
